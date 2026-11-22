@@ -164,7 +164,7 @@ h+='<div class="progress"><div class="bar"><i class="d" style="width:'+pd+'%"></
 h+='<span><i class="k" style="background:var(--good)"></i>Done <b>'+s.done+'</b></span><span><i class="k" style="background:var(--accent);opacity:.55"></i>Scheduled <b>'+s.openSched+'</b></span><span><i class="k" style="background:var(--line)"></i>Not scheduled <b>'+s.pool+'</b></span><span>Total <b>'+s.total+'</b></span></div></div></header>';
 return h;}
 function menuHTML(){var o=function(t,v){return'<option'+(state.limits[t]==v?' selected':'')+'>'+v+'</option>';};
-return'<div class="menu"><label>Work max per day <select data-limit="work">'+o("work",3)+o("work",4)+'</select></label><label>Uni max per day <select data-limit="uni">'+o("uni",3)+o("uni",4)+'</select></label><label>Sounds <input type="checkbox" data-sound'+(state.sound!==false?' checked':'')+'></label><div class="sep"></div><button data-act="newweek">Start new week…</button><button data-act="export">Export backup</button><button data-act="import">Import backup</button></div>';}
+return'<div class="menu"><label>Work max per day <select data-limit="work">'+o("work",3)+o("work",4)+'</select></label><label>Uni max per day <select data-limit="uni">'+o("uni",3)+o("uni",4)+'</select></label><label>Sounds <input type="checkbox" data-sound'+(state.sound!==false?' checked':'')+'></label><div class="sep"></div><button data-act="bulk">Add many tasks\u2026</button><button data-act="newweek">Start new week…</button><button data-act="export">Export backup</button><button data-act="import">Import backup</button></div>';}
 
 function boardHTML(){
 var h='<div class="layout"><section class="panel pool"><div class="ph"><h2>Not scheduled <span class="count">'+state.lists.pool.length+'</span></h2><button class="plain collapse" id="collapse">'+(poolOpen?"Hide":"Show")+'</button></div>';
@@ -212,7 +212,7 @@ if(el.closest("#undo")){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;en
 var v=el.closest("[data-view]");if(v){view=v.getAttribute("data-view");try{localStorage.setItem(LSV,view);}catch(x){}menuOpen=false;render();return;}
 if(el.closest("#menubtn")){menuOpen=!menuOpen;render();return;}
 if(menuOpen&&!el.closest(".menu")){menuOpen=false;render();}
-var a=el.closest("[data-act]");if(a&&a.closest(".menu")){var act=a.getAttribute("data-act");menuOpen=false;render();if(act==="newweek")newWeek();if(act==="export")exportDlg();if(act==="import")importDlg();return;}
+var a=el.closest("[data-act]");if(a&&a.closest(".menu")){var act=a.getAttribute("data-act");menuOpen=false;render();if(act==="bulk")bulkDlg();if(act==="newweek")newWeek();if(act==="export")exportDlg();if(act==="import")importDlg();return;}
 if(el.closest("#collapse")){poolOpen=!poolOpen;render();return;}
 var sw=el.closest("[data-newcolor]");if(sw){newColor=sw.getAttribute("data-newcolor");render();var n=document.getElementById("newname");if(n)n.focus();return;}
 var ck=el.closest("[data-check]");if(ck){var id=ck.getAttribute("data-check");state.tasks[id].done=!state.tasks[id].done;if(state.tasks[id].done){popId=id;playDone();}save();if(state.tasks[id].done){var s=stats();if(s.total&&s.done===s.total)toast("Everything done this week");}return;}
@@ -234,6 +234,11 @@ inp.addEventListener("keydown",function(e){if(e.key==="Enter")commit();});
 m.addEventListener("click",function(e){var c=e.target.closest("[data-ec]");if(c){color=c.getAttribute("data-ec");m.querySelector("#esw").innerHTML=sws();return;}
 var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();if(d==="save")commit();
 if(d==="del"){snapshot();var k=findList(id);if(k)state.lists[k].splice(state.lists[k].indexOf(id),1);delete state.tasks[id];m.remove();save();toast("Task deleted",true);}});});}
+function bulkDlg(){var color=newColor;var sws=function(){return COLORS.map(function(c){return'<button type="button" class="sw'+(c===color?' on':'')+'" data-bc="'+c+'" style="--c:'+c+'" aria-label="Color"></button>';}).join("");};
+dialog('<h3>Add many tasks</h3><p>One task per line. They all get the color you pick.</p><textarea id="bulk" placeholder="Task one&#10;Task two&#10;Task three"></textarea><div class="swatches" id="bsw">'+sws()+'</div><div class="btns"><button data-d="cancel">Cancel</button><button class="primary" data-d="ok">Add tasks</button></div>',function(m){
+m.addEventListener("click",function(e){var c=e.target.closest("[data-bc]");if(c){color=c.getAttribute("data-bc");m.querySelector("#bsw").innerHTML=sws();return;}
+var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();if(d==="ok"){var lines=m.querySelector("#bulk").value.split(/\n/).map(function(x){return x.replace(/^[\s\-\*•\d\.\)]+/,"").trim();}).filter(Boolean);if(!lines.length){m.remove();return;}
+lines.forEach(function(n){var id="t"+(state.next++);state.tasks[id]={name:n,color:color,done:false};state.lists.pool.push(id);});m.remove();playAdd();save();toast(lines.length+" tasks added");}});});}
 function newWeek(){var s=stats();
 dialog('<h3>Start a new week?</h3><p>'+s.done+' done task'+(s.done===1?'':'s')+' will be removed. '+s.openSched+' open task'+(s.openSched===1?'':'s')+' go back to Not scheduled.</p><div class="btns"><button data-d="cancel">Cancel</button><button class="primary" data-d="ok">Start new week</button></div>',function(m){
 m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();if(d==="ok"){snapshot();
@@ -244,7 +249,7 @@ function exportDlg(){dialog('<h3>Export backup</h3><p>Copy this text and keep it
 var ta=m.querySelector("#io");ta.value=JSON.stringify(state);
 m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();if(d==="copy"){var fb=function(){ta.focus();ta.select();toast("Select all and copy");};try{navigator.clipboard.writeText(ta.value).then(function(){toast("Copied");},fb);}catch(x){fb();}}});});}
 function importDlg(){dialog('<h3>Import backup</h3><p>Paste a backup. It replaces everything on this device.</p><textarea id="io"></textarea><div class="btns"><button data-d="cancel">Cancel</button><button class="primary" data-d="ok">Import</button></div>',function(m){
-m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();if(d==="ok"){try{var s=JSON.parse(m.querySelector("#io").value);if(!s||!s.tasks||!s.lists)throw 0;snapshot();state=s;ensure();m.remove();save();toast("Backup imported",true);}catch(x){toast("That is not a valid backup");}}});});}
+m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();if(d==="ok"){try{var raw=m.querySelector("#io").value.replace(/[\u201c\u201d\u201e\u201f]/g,'"').replace(/[\u2018\u2019]/g,"'").replace(/[\u00a0\u200b\u200c\u200d\ufeff]/g," ");var a=raw.indexOf("{"),b=raw.lastIndexOf("}");var s=JSON.parse(raw.slice(a,b+1));if(!s||!s.tasks||!s.lists)throw 0;snapshot();state=s;ensure();m.remove();save();toast("Backup imported",true);}catch(x){toast("That is not a valid backup");}}});});}
 
 // sounds (Web Audio, no files needed)
 var actx=null;

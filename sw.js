@@ -1,5 +1,5 @@
 // Offline cache for Week Planner. Change the version to force an update.
-const CACHE = "week-planner-v3";
+const CACHE = "week-planner-v4";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon.png"];
 
 self.addEventListener("install", e => {
