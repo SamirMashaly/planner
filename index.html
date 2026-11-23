@@ -157,8 +157,8 @@ header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 8
 .pbar i{display:block;height:100%;background:var(--c)}
 .ctrbtns{display:flex;gap:6px;flex-wrap:wrap}
 .note{font-size:12.5px;color:var(--muted)}
-.usum{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
-@media (max-width:700px){.usum{grid-template-columns:1fr}}
+.usum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+@media (max-width:700px){.usum{grid-template-columns:1fr 1fr}}
 .modal{position:fixed;inset:0;background:rgba(10,12,16,.45);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;animation:fade .15s}
 @keyframes fade{from{opacity:0}}
 .dialog{background:var(--panel);border-radius:16px;padding:18px;width:min(440px,100%);max-height:calc(100vh - 32px);overflow:auto;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
@@ -208,7 +208,7 @@ var MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","D
 var SEED_SUBJECTS=[
 {id:"s1",name:"Mathe II",color:"#22c55e",exam:"2027-03-15",attempt:2,note:"Exam only this semester. Kap 10 to 11.",ctr:[{label:"Übungen",done:0,released:6,total:null}]},
 {id:"s2",name:"Mathe III",color:"#16a34a",exam:"2027-03-11",attempt:1,note:"Kap 18.2",ctr:[{label:"Übungen",done:0,released:6,total:null}]},
-{id:"s3",name:"EtIT I",color:"#0ea5e9",exam:"2027-04-02",attempt:2,note:"Kontrollfragen in GoodNotes.",ctr:[{label:"Übungen",done:0,released:6,total:13},{label:"Vorlesungen",done:0,released:13,total:null}]},
+{id:"s3",name:"EtIT I",color:"#0ea5e9",exam:"2027-04-02",attempt:2,note:"Kontrollfragen in GoodNotes.",ctr:[{label:"Vorlesungen",done:0,released:13,total:23},{label:"Übungen",done:0,released:6,total:13},{label:"Kontrollfragen",done:0,released:13,total:23}]},
 {id:"s4",name:"Logischer Entwurf",color:"#f97316",exam:"2027-03-16",attempt:2,note:"Hausübung hand-in + test every Monday morning. Kap 4.",ctr:[{label:"Übungen",done:0,released:5,total:null}]},
 {id:"s5",name:"Elektronik",color:"#eab308",exam:"",attempt:1,note:"Klausur in March, date still open.",ctr:[{label:"Übungen",done:0,released:2,total:null}]},
 {id:"s6",name:"HBE",color:"#8b5cf6",exam:"",attempt:1,note:"English script. Kap 5.",ctr:[{label:"Vorlesungen",done:0,released:8,total:null}]},
@@ -223,7 +223,7 @@ var SUGGESTED_ROUTINE=[
 
 var state={limits:{work:4,uni:4},tasks:{},lists:{pool:[]},next:1};
 try{var saved=JSON.parse(localStorage.getItem(LS)||"null");if(saved&&saved.tasks)state=saved;}catch(e){}
-var view="today";try{view=localStorage.getItem(LSV)||"today";}catch(e){}
+var view="today";
 var newColor=COLORS[0],menuOpen=false,poolOpen=true,pickOpen=false,popId=null;
 
 function pad(n){return(n<10?"0":"")+n;}
@@ -247,6 +247,7 @@ state.recurring=state.recurring||[];state.rdone=state.rdone||{};state.dayLog=sta
 state.focusMin=state.focusMin||90;state.tracking=state.tracking||null;for(var tid in state.tasks){if(!state.tasks[tid].spent)state.tasks[tid].spent=0;}state.breakMin=state.breakMin||30;
 if(!state.subjects)state.subjects=JSON.parse(JSON.stringify(SEED_SUBJECTS));
 if(!state.weekOf)state.weekOf=ymd(monday());
+if((state.uniV||1)<2){var et=state.subjects.filter(function(z){return z.id==="s3";})[0];if(et){var fc=function(l){return et.ctr.filter(function(c){return c.label===l;})[0];};var vl=fc("Vorlesungen"),ue=fc("Übungen");if(vl)vl.total=23;else et.ctr.unshift({label:"Vorlesungen",done:0,released:13,total:23});if(ue&&!ue.total)ue.total=13;if(!fc("Kontrollfragen"))et.ctr.push({label:"Kontrollfragen",done:0,released:13,total:23});var order=["Vorlesungen","Übungen","Kontrollfragen"];et.ctr.sort(function(a,b){return order.indexOf(a.label)-order.indexOf(b.label);});}state.uniV=2;}
 var cut=new Date();cut.setDate(cut.getDate()-70);var ck=ymd(cut);
 for(var k in state.rdone){if(k.slice(0,10)<ck)delete state.rdone[k];}
 }
@@ -292,9 +293,9 @@ var range=m.getDate()+(m.getMonth()!==e.getMonth()?" "+MONTHS[m.getMonth()]:"")+
 var pd=s.total?s.done/s.total*100:0,ps=s.total?s.openSched/s.total*100:0;
 var tabs=[["today","Today"],["board","Board"],["overview","Overview"],["uni","Uni"]];
 var h='<header><div class="top"><h1>Week Planner</h1><span class="range">'+range+'</span><span class="spacer"></span><div class="seg">'+tabs.map(function(t){return'<button data-view="'+t[0]+'" class="'+(view===t[0]?"on":"")+'">'+t[1]+"</button>";}).join("")+'</div><div class="menuwrap"><button class="plain" id="menubtn" aria-label="More">•••</button>'+(menuOpen?menuHTML():"")+"</div></div>";
-h+='<div class="progress"><div class="bar"><i class="d" style="width:'+pd+'%"></i><i class="s" style="width:'+ps+'%"></i></div><div class="chips"><span><i class="k" style="background:var(--good)"></i>Done <b>'+s.done+'</b></span><span><i class="k" style="background:var(--accent);opacity:.55"></i>Scheduled <b>'+s.openSched+'</b></span><span><i class="k" style="background:var(--line)"></i>Not scheduled <b>'+s.pool+"</b></span><span>Total <b>"+s.total+"</b></span>"+(syncCfg().token?'<span id="syncst" data-act="sync" style="cursor:pointer">'+syncLabel()+"</span>":"")+"</div></div>";
+if(view!=="today"){h+='<div class="progress"><div class="bar"><i class="d" style="width:'+pd+'%"></i><i class="s" style="width:'+ps+'%"></i></div><div class="chips"><span><i class="k" style="background:var(--good)"></i>Done <b>'+s.done+'</b></span><span><i class="k" style="background:var(--accent);opacity:.55"></i>Scheduled <b>'+s.openSched+'</b></span><span><i class="k" style="background:var(--line)"></i>Not scheduled <b>'+s.pool+"</b></span><span>Total <b>"+s.total+"</b></span>"+(syncCfg().token?'<span id="syncst" data-act="sync" style="cursor:pointer">'+syncLabel()+"</span>":"")+"</div></div>";
 var st=streak(),ex=examList();
-h+='<div class="exams">'+(st?'<span class="ex streak">Streak <b>'+st+" day"+(st===1?"":"s")+"</b></span>":"")+ex.map(function(x){var n=daysUntil(x.exam);return'<span class="ex '+(n<=14?"red":n<=30?"orange":"")+'">'+esc(x.name)+" <b>"+(n===0?"today":n+" d")+"</b></span>";}).join("")+"</div></header>";
+h+='<div class="exams">'+(st?'<span class="ex streak">Streak <b>'+st+" day"+(st===1?"":"s")+"</b></span>":"")+ex.map(function(x){var n=daysUntil(x.exam);return'<span class="ex '+(n<=14?"red":n<=30?"orange":"")+'">'+esc(x.name)+" <b>"+(n===0?"today":n+" d")+"</b></span>";}).join("")+"</div>";}h+="</header>";
 if(state.weekOf!==ymd(monday()))h+='<div class="banner">A new week has started. Clear the old one to start fresh. <button class="small primary" data-act="newweek">Start new week</button></div>';
 return h;}
 function menuHTML(){var o=function(k,v,cur){return"<option"+(cur==v?" selected":"")+">"+v+"</option>";};
@@ -346,14 +347,14 @@ h+='<div class="cols"><div class="panel"><div class="ph"><h2>Not scheduled</h2><
 return h;}
 
 function uniHTML(){
-var openUe=0,openVl=0;state.subjects.forEach(function(s){s.ctr.forEach(function(c){var o=Math.max(0,c.released-c.done);if(c.label==="Übungen")openUe+=o;if(c.label==="Vorlesungen")openVl+=o;});});
+var openUe=0,openVl=0,left=0,unknown=0;state.subjects.forEach(function(s){s.ctr.forEach(function(c){var o=Math.max(0,c.released-c.done);if(c.label==="Übungen")openUe+=o;if(c.label==="Vorlesungen")openVl+=o;left+=Math.max(0,(c.total||c.released)-c.done);if(!c.total)unknown++;});});
 var ex=examList()[0];
-var h='<div class="page"><div class="usum"><div class="stat"><div class="v">'+openUe+'</div><div class="l">Übungen open (released, not done)</div></div><div class="stat"><div class="v">'+openVl+'</div><div class="l">Vorlesungen to review</div></div><div class="stat"><div class="v">'+(ex?daysUntil(ex.exam)+" d":"–")+'</div><div class="l">'+(ex?"Next Klausur: "+esc(ex.name)+" ("+fmt(parseYmd(ex.exam))+")":"No Klausur dates set")+'</div></div></div><div class="ugrid">';
+var h='<div class="page"><div class="usum"><div class="stat"><div class="v">'+openUe+'</div><div class="l">Übungen open (released, not done)</div></div><div class="stat"><div class="v">'+openVl+'</div><div class="l">Vorlesungen to catch up</div></div><div class="stat"><div class="v">'+left+'</div><div class="l">Items left this semester'+(unknown?' ('+unknown+' counter'+(unknown===1?'':'s')+' without a total yet)':'')+'</div></div><div class="stat"><div class="v">'+(ex?daysUntil(ex.exam)+" d":"–")+'</div><div class="l">'+(ex?"Next Klausur: "+esc(ex.name)+" ("+fmt(parseYmd(ex.exam))+")":"No Klausur dates set")+'</div></div></div><div class="ugrid">';
 state.subjects.forEach(function(s){
 var n=s.exam?daysUntil(s.exam):null;
 h+='<div class="subj" style="--c:'+esc(s.color)+'"><h3>'+esc(s.name)+(s.attempt>1?'<span class="tag">'+(s.attempt===2?"2nd":"3rd")+" attempt</span>":'<span class="tag first">1st attempt</span>')+'</h3><div class="exline">'+(s.exam?(n>=0?"Klausur in <b>"+n+" days</b> · "+fmtDay(s.exam):"Klausur was "+fmtDay(s.exam)):"Klausur date open")+"</div>";
 s.ctr.forEach(function(c,ci){var pct=c.released?Math.round(c.done/c.released*100):0;
-h+='<div class="ctr"><div class="ctrtop"><span>'+esc(c.label)+"</span><span><b>"+c.done+" / "+c.released+"</b> done"+(c.total?" · "+c.total+" total":"")+'</span></div><div class="pbar"><i style="width:'+pct+'%"></i></div><div class="ctrbtns"><button class="small" data-ctr="'+s.id+"|"+ci+'|minus">− done</button><button class="small" data-ctr="'+s.id+"|"+ci+'|plus">+ done</button><button class="small" data-ctr="'+s.id+"|"+ci+'|rel">+1 released</button>'+(c.label==="Übungen"&&c.released>c.done?'<button class="small primary" data-gen="'+s.id+"|"+ci+'">Create tasks for open Übungen</button>':"")+"</div></div>";});
+h+='<div class="ctr"><div class="ctrtop"><span>'+esc(c.label)+"</span><span><b>"+c.done+" / "+c.released+"</b> done"+(c.total?" · "+c.total+" total · "+Math.max(0,c.total-c.done)+" left":"")+'</span></div><div class="pbar"><i style="width:'+pct+'%"></i></div><div class="ctrbtns"><button class="small" data-ctr="'+s.id+"|"+ci+'|minus">− done</button><button class="small" data-ctr="'+s.id+"|"+ci+'|plus">+ done</button><button class="small" data-ctr="'+s.id+"|"+ci+'|rel">+1 released</button>'+(c.released>c.done?'<button class="small primary" data-gen="'+s.id+"|"+ci+'">Create tasks for open '+esc(c.label)+'</button>':"")+"</div></div>";});
 h+=(s.note?'<div class="note">'+esc(s.note)+"</div>":"")+'<div class="ctrbtns"><button class="small" data-subj="'+s.id+'">Edit</button></div></div>';});
 return h+'</div><div style="margin-top:12px"><button data-addsubj="1">+ Add subject</button></div></div>';}
 
@@ -432,7 +433,8 @@ var l=t.getAttribute("data-limit");if(l){state.limits[l]=Number(t.value);persist
 var st=t.getAttribute("data-set");if(st){state[st]=Number(t.value);persist();}});
 
 function genTasks(ref){var r=ref.split("|"),s=state.subjects.filter(function(z){return z.id===r[0];})[0],ci=+r[1],c=s.ctr[ci],made=0;
-for(var n=c.done+1;n<=c.released;n++){var name=s.name+" Ü"+n,exists=false;for(var id in state.tasks){if(state.tasks[id].name===name){exists=true;break;}}
+var short={"Übungen":"Ü","Vorlesungen":"VL ","Kontrollfragen":"KF ","Versuche":"Versuch "}[c.label]||(c.label+" ");
+for(var n=c.done+1;n<=c.released;n++){var name=s.name+" "+short+n,exists=false;for(var id in state.tasks){if(state.tasks[id].name===name){exists=true;break;}}
 if(exists)continue;var nid=uid("t");state.tasks[nid]={name:name,color:s.color,done:false,subs:[],subj:s.id,ctr:ci};state.lists.pool.push(nid);made++;}
 if(made){playAdd();save();toast(made+" task"+(made===1?"":"s")+" added to Not scheduled");}else toast("Those tasks already exist");}
 
@@ -486,10 +488,13 @@ if(d==="cancel")m.remove();
 if(d==="save"){sync();state.recurring=list.filter(function(r){return r.name.trim()&&r.days.length;});m.remove();playAdd();save();toast("Recurring tasks saved");}});});}
 
 function subjectDlg(sid){var s=state.subjects.filter(function(z){return z.id===sid;})[0];if(!s)return;var color=s.color;
-dialog('<h3>Edit subject</h3><input type="text" id="sname" value="'+esc(s.name)+'"><div class="swatches" id="ssw">'+swatchHTML(color,"data-sc")+'</div><div class="two"><label class="field"><span>Klausur date</span><input type="date" id="sexam" value="'+esc(s.exam||"")+'"></label><label class="field"><span>Attempt</span><select id="satt"><option value="1"'+(s.attempt===1?" selected":"")+'>1st</option><option value="2"'+(s.attempt===2?" selected":"")+'>2nd</option><option value="3"'+(s.attempt===3?" selected":"")+">3rd</option></select></label></div>"+s.ctr.map(function(c,i){return'<div class="field"><span>'+esc(c.label)+'</span><div class="two"><label class="field"><span>Released so far</span><input type="number" min="0" data-crel="'+i+'" value="'+c.released+'"></label><label class="field"><span>Total in semester (if known)</span><input type="number" min="0" data-ctot="'+i+'" value="'+(c.total||"")+'"></label></div></div>';}).join("")+'<label class="field"><span>Notes</span><textarea id="snote">'+esc(s.note||"")+'</textarea></label><div class="btns"><button class="danger left" data-d="del">Delete</button><button data-d="cancel">Cancel</button><button class="primary" data-d="save">Save</button></div>',function(m){
+dialog('<h3>Edit subject</h3><input type="text" id="sname" value="'+esc(s.name)+'"><div class="swatches" id="ssw">'+swatchHTML(color,"data-sc")+'</div><div class="two"><label class="field"><span>Klausur date</span><input type="date" id="sexam" value="'+esc(s.exam||"")+'"></label><label class="field"><span>Attempt</span><select id="satt"><option value="1"'+(s.attempt===1?" selected":"")+'>1st</option><option value="2"'+(s.attempt===2?" selected":"")+'>2nd</option><option value="3"'+(s.attempt===3?" selected":"")+">3rd</option></select></label></div>"+s.ctr.map(function(c,i){return'<div class="field"><span>'+esc(c.label)+'</span><div class="two"><label class="field"><span>Released so far <button type="button" class="small plain" data-rmctr="'+i+'" style="padding:0 4px;color:var(--danger)">remove</button></span><input type="number" min="0" data-crel="'+i+'" value="'+c.released+'"></label><label class="field"><span>Total in semester (if known)</span><input type="number" min="0" data-ctot="'+i+'" value="'+(c.total||"")+'"></label></div></div>';}).join("")+'<div class="esub"><input type="text" id="newctr" placeholder="Add a counter, e.g. Kontrollfragen"><button class="small" data-d="addctr">Add</button></div><label class="field"><span>Notes</span><textarea id="snote">'+esc(s.note||"")+'</textarea></label><div class="btns"><button class="danger left" data-d="del">Delete</button><button data-d="cancel">Cancel</button><button class="primary" data-d="save">Save</button></div>',function(m){
 m.addEventListener("click",function(e){var c=e.target.closest("[data-sc]");if(c){color=c.getAttribute("data-sc");m.querySelector("#ssw").innerHTML=swatchHTML(color,"data-sc");return;}
 var d=e.target.getAttribute("data-d");if(d==="cancel")m.remove();
 if(d==="del"){snapshot();state.subjects=state.subjects.filter(function(z){return z.id!==sid;});m.remove();save();toast("Subject deleted",true);}
+var apply=function(){s.name=m.querySelector("#sname").value.trim()||s.name;s.color=color;s.exam=m.querySelector("#sexam").value||"";s.attempt=+m.querySelector("#satt").value;s.note=m.querySelector("#snote").value;m.querySelectorAll("[data-crel]").forEach(function(x){var c2=s.ctr[+x.getAttribute("data-crel")];c2.released=Math.max(0,+x.value||0);c2.done=Math.min(c2.done,c2.released);});m.querySelectorAll("[data-ctot]").forEach(function(x){s.ctr[+x.getAttribute("data-ctot")].total=x.value?+x.value:null;});};
+var rmc=e.target.closest("[data-rmctr]");if(rmc){apply();s.ctr.splice(+rmc.getAttribute("data-rmctr"),1);m.remove();save();subjectDlg(sid);return;}
+if(d==="addctr"){var lb=m.querySelector("#newctr").value.trim();if(!lb)return;apply();s.ctr.push({label:lb,done:0,released:0,total:null});m.remove();save();subjectDlg(sid);return;}
 if(d==="save"){s.name=m.querySelector("#sname").value.trim()||s.name;s.color=color;s.exam=m.querySelector("#sexam").value||"";s.attempt=+m.querySelector("#satt").value;s.note=m.querySelector("#snote").value;
 m.querySelectorAll("[data-crel]").forEach(function(x){var c2=s.ctr[+x.getAttribute("data-crel")];c2.released=Math.max(0,+x.value||0);c2.done=Math.min(c2.done,c2.released);});
 m.querySelectorAll("[data-ctot]").forEach(function(x){s.ctr[+x.getAttribute("data-ctot")].total=x.value?+x.value:null;});m.remove();save();}});});}
