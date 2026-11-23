@@ -292,13 +292,13 @@ var range=m.getDate()+(m.getMonth()!==e.getMonth()?" "+MONTHS[m.getMonth()]:"")+
 var pd=s.total?s.done/s.total*100:0,ps=s.total?s.openSched/s.total*100:0;
 var tabs=[["today","Today"],["board","Board"],["overview","Overview"],["uni","Uni"]];
 var h='<header><div class="top"><h1>Week Planner</h1><span class="range">'+range+'</span><span class="spacer"></span><div class="seg">'+tabs.map(function(t){return'<button data-view="'+t[0]+'" class="'+(view===t[0]?"on":"")+'">'+t[1]+"</button>";}).join("")+'</div><div class="menuwrap"><button class="plain" id="menubtn" aria-label="More">•••</button>'+(menuOpen?menuHTML():"")+"</div></div>";
-h+='<div class="progress"><div class="bar"><i class="d" style="width:'+pd+'%"></i><i class="s" style="width:'+ps+'%"></i></div><div class="chips"><span><i class="k" style="background:var(--good)"></i>Done <b>'+s.done+'</b></span><span><i class="k" style="background:var(--accent);opacity:.55"></i>Scheduled <b>'+s.openSched+'</b></span><span><i class="k" style="background:var(--line)"></i>Not scheduled <b>'+s.pool+"</b></span><span>Total <b>"+s.total+"</b></span></div></div>";
+h+='<div class="progress"><div class="bar"><i class="d" style="width:'+pd+'%"></i><i class="s" style="width:'+ps+'%"></i></div><div class="chips"><span><i class="k" style="background:var(--good)"></i>Done <b>'+s.done+'</b></span><span><i class="k" style="background:var(--accent);opacity:.55"></i>Scheduled <b>'+s.openSched+'</b></span><span><i class="k" style="background:var(--line)"></i>Not scheduled <b>'+s.pool+"</b></span><span>Total <b>"+s.total+"</b></span>"+(syncCfg().token?'<span id="syncst" data-act="sync" style="cursor:pointer">'+syncLabel()+"</span>":"")+"</div></div>";
 var st=streak(),ex=examList();
 h+='<div class="exams">'+(st?'<span class="ex streak">Streak <b>'+st+" day"+(st===1?"":"s")+"</b></span>":"")+ex.map(function(x){var n=daysUntil(x.exam);return'<span class="ex '+(n<=14?"red":n<=30?"orange":"")+'">'+esc(x.name)+" <b>"+(n===0?"today":n+" d")+"</b></span>";}).join("")+"</div></header>";
 if(state.weekOf!==ymd(monday()))h+='<div class="banner">A new week has started. Clear the old one to start fresh. <button class="small primary" data-act="newweek">Start new week</button></div>';
 return h;}
 function menuHTML(){var o=function(k,v,cur){return"<option"+(cur==v?" selected":"")+">"+v+"</option>";};
-return'<div class="menu"><label>Work max per day <select data-limit="work">'+o(0,3,state.limits.work)+o(0,4,state.limits.work)+'</select></label><label>Uni max per day <select data-limit="uni">'+o(0,3,state.limits.uni)+o(0,4,state.limits.uni)+'</select></label><label>Focus minutes <select data-set="focusMin">'+[25,45,60,90,120].map(function(v){return o(0,v,state.focusMin);}).join("")+'</select></label><label>Break minutes <select data-set="breakMin">'+[5,10,15,20,30].map(function(v){return o(0,v,state.breakMin);}).join("")+'</select></label><label>Sounds <input type="checkbox" data-sound'+(state.sound!==false?" checked":"")+'></label><div class="sep"></div><button data-act="recurring">Recurring tasks…</button><button data-act="bulk">Add many tasks…</button><button data-act="newweek">Start new week…</button><div class="sep"></div><button data-act="export">Export backup</button><button data-act="import">Import backup</button></div>';}
+return'<div class="menu"><label>Work max per day <select data-limit="work">'+o(0,3,state.limits.work)+o(0,4,state.limits.work)+'</select></label><label>Uni max per day <select data-limit="uni">'+o(0,3,state.limits.uni)+o(0,4,state.limits.uni)+'</select></label><label>Focus minutes <select data-set="focusMin">'+[25,45,60,90,120].map(function(v){return o(0,v,state.focusMin);}).join("")+'</select></label><label>Break minutes <select data-set="breakMin">'+[5,10,15,20,30].map(function(v){return o(0,v,state.breakMin);}).join("")+'</select></label><label>Sounds <input type="checkbox" data-sound'+(state.sound!==false?" checked":"")+'></label><div class="sep"></div><button data-act="sync">Sync between devices…</button><button data-act="recurring">Recurring tasks…</button><button data-act="bulk">Add many tasks…</button><button data-act="newweek">Start new week…</button><div class="sep"></div><button data-act="export">Export backup</button><button data-act="import">Import backup</button></div>';}
 
 function routineStrip(i){var x=dayItems(i);if(!x.rec.length)return"";
 return'<div class="rstrip">'+x.rec.map(function(r){var on=state.rdone[x.key+"|"+r.id];return'<button class="rchip'+(on?" done":"")+'" data-rdone="'+x.key+"|"+r.id+'" style="--c:'+esc(r.color)+'"><i></i>'+esc(r.name)+"</button>";}).join("")+"</div>";}
@@ -362,7 +362,8 @@ var body=view==="board"?boardHTML():view==="overview"?overviewHTML():view==="uni
 root.innerHTML=headerHTML()+body;popId=null;
 var n2=document.getElementById("newname");if(n2){n2.value=keep;if(focused)n2.focus();}
 if(view==="board"){var td=document.querySelector(".day.today"),wk=document.querySelector(".week");if(td&&wk&&!render.scrolled&&window.innerWidth<=900){wk.scrollLeft=td.offsetLeft-wk.offsetLeft;render.scrolled=true;}}}
-function persist(){try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){}}
+function persistRaw(){try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){}}
+function persist(){state.savedAt=Date.now();persistRaw();if(typeof schedulePush==="function")schedulePush();}
 function save(){updateLog();persist();render();}
 var undoSnap=null,toastTimer=null;
 function snapshot(){undoSnap=JSON.stringify(state);}
@@ -405,7 +406,7 @@ if(el.closest("#tpause")){var T=state.timer;if(T){if(T.paused!=null){T.endsAt=Da
 var v=el.closest("[data-view]");if(v){view=v.getAttribute("data-view");try{localStorage.setItem(LSV,view);}catch(x){}menuOpen=false;render.scrolled=false;render();window.scrollTo(0,0);return;}
 if(el.closest("#menubtn")){menuOpen=!menuOpen;render();return;}
 if(menuOpen&&!el.closest(".menu")){menuOpen=false;render();}
-var a=el.closest("[data-act]");if(a){var act=a.getAttribute("data-act");menuOpen=false;render();if(act==="newweek")newWeek();if(act==="export")exportDlg();if(act==="import")importDlg();if(act==="bulk")bulkDlg();if(act==="recurring")recurringDlg();return;}
+var a=el.closest("[data-act]");if(a){var act=a.getAttribute("data-act");menuOpen=false;render();if(act==="newweek")newWeek();if(act==="export")exportDlg();if(act==="import")importDlg();if(act==="bulk")bulkDlg();if(act==="recurring")recurringDlg();if(act==="sync")syncDlg();return;}
 if(el.closest("#collapse")){poolOpen=!poolOpen;render();return;}
 if(el.closest("#picktoggle")){pickOpen=!pickOpen;render();return;}
 var sw=el.closest("[data-newcolor]");if(sw){newColor=sw.getAttribute("data-newcolor");render();var nn=document.getElementById("newname");if(nn)nn.focus();return;}
@@ -557,7 +558,49 @@ e.preventDefault();moveDrag(t.clientX,t.clientY);},{passive:false});
 document.addEventListener("touchend",function(e){if(!drag||!drag.touch)return;drag.card.classList.remove("press");if(drag.started){e.preventDefault();finishDrag(false);}else{clearTimeout(drag.timer);drag=null;}},{passive:false});
 document.addEventListener("touchcancel",function(){if(drag&&drag.touch){drag.card.classList.remove("press");finishDrag(true);}});
 
-updateLog();persist();render();renderPill();
+updateLog();persistRaw();
+// ---------- sync via a private GitHub Gist ----------
+var SK="week-planner-sync",FILE="week-planner.json",pushTimer=null,syncState="idle",pulling=false;
+function syncCfg(){try{return JSON.parse(localStorage.getItem(SK)||"{}");}catch(e){return{};}}
+function setSyncCfg(c){try{localStorage.setItem(SK,JSON.stringify(c));}catch(e){}}
+function syncLabel(){return{idle:"☁ Synced",push:"☁ Syncing…",off:"☁ Offline, will sync",err:"☁ Sync problem"}[syncState]||"";}
+function setSync(st){syncState=st;var el=document.getElementById("syncst");if(el)el.textContent=syncLabel();}
+function gh(path,opt){var c=syncCfg();opt=opt||{};opt.headers={"Authorization":"token "+c.token,"Accept":"application/vnd.github+json"};if(opt.body)opt.headers["Content-Type"]="application/json";opt.cache="no-store";
+return fetch("https://api.github.com"+path,opt).then(function(r){if(!r.ok){var e=new Error("http "+r.status);e.status=r.status;throw e;}return r.json();});}
+function readGist(g){var f=g.files&&g.files[FILE];if(!f)return Promise.resolve(null);
+if(f.truncated&&f.raw_url)return fetch(f.raw_url,{cache:"no-store"}).then(function(r){return r.json();});
+try{return Promise.resolve(JSON.parse(f.content));}catch(e){return Promise.resolve(null);}}
+function fileObj(){var o={};o[FILE]={content:JSON.stringify(state)};return o;}
+function schedulePush(){var c=syncCfg();if(!c.token||!c.gist||pulling)return;clearTimeout(pushTimer);setSync("push");pushTimer=setTimeout(pushNow,1200);}
+function pushNow(){pushTimer=null;var c=syncCfg();if(!c.token||!c.gist)return;
+gh("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:fileObj()})}).then(function(){setSync("idle");}).catch(function(){setSync(navigator.onLine===false?"off":"err");});}
+function pull(){var c=syncCfg();if(!c.token||!c.gist||pushTimer)return Promise.resolve();
+return gh("/gists/"+c.gist).then(readGist).then(function(remote){
+if(pushTimer)return;
+if(remote&&remote.tasks&&(remote.savedAt||0)>(state.savedAt||0)){pulling=true;state=remote;ensure();persistRaw();pulling=false;render();renderPill();}
+setSync("idle");}).catch(function(){setSync(navigator.onLine===false?"off":"err");});}
+function connect(token,choice,m){var c={token:token};setSyncCfg(c);
+var st=m.querySelector("#syncmsg");st.textContent="Connecting…";
+gh("/gists?per_page=100").then(function(list){var g=list.filter(function(x){return x.files&&x.files[FILE];})[0];
+if(!g){return gh("/gists",{method:"POST",body:JSON.stringify({description:"Week Planner sync",public:false,files:fileObj()})}).then(function(ng){c.gist=ng.id;setSyncCfg(c);return"created";});}
+c.gist=g.id;setSyncCfg(c);
+return gh("/gists/"+g.id).then(readGist).then(function(remote){
+if(choice==="cloud"&&remote&&remote.tasks){pulling=true;state=remote;ensure();persistRaw();pulling=false;return"pulled";}
+state.savedAt=Date.now();persistRaw();
+return gh("/gists/"+g.id,{method:"PATCH",body:JSON.stringify({files:fileObj()})}).then(function(){return"pushed";});});})
+.then(function(r){setSync("idle");m.remove();render();renderPill();toast(r==="pulled"?"Synced: loaded your data from the cloud":r==="created"?"Sync is on. This device is now the source.":"Synced: this device's data is now in the cloud");})
+.catch(function(e){setSyncCfg({});st.textContent=e.status===401?"That token doesn't work. Check that you copied all of it and ticked “gist”.":"Couldn't connect. Check your internet and try again.";});}
+function syncDlg(){var c=syncCfg();
+if(c.token&&c.gist){dialog('<h3>Sync is on</h3><p>This device syncs automatically with your other devices through a private Gist on your GitHub.</p><p>Status: '+syncLabel()+'</p><div class="btns"><button class="danger left" data-d="off">Turn off here</button><button data-d="now">Sync now</button><button class="primary" data-d="close">Done</button></div>',function(m){
+m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="close")m.remove();if(d==="now"){pull().then(function(){if(syncState==="idle")toast("Up to date");});}if(d==="off"){setSyncCfg({});m.remove();render();toast("Sync turned off on this device");}});});return;}
+dialog('<h3>Sync between devices</h3><p>Paste your GitHub token (it starts with ghp_). Use the same token on every device.</p><input type="text" id="tok" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false"><p><b>Device that has your tasks:</b> Upload this device.<br><b>Every other device:</b> Use cloud data.</p><p id="syncmsg" style="color:var(--danger)"></p><div class="btns"><button data-d="cancel" class="left">Cancel</button><button data-d="up">Upload this device</button><button class="primary" data-d="cloud">Use cloud data</button></div>',function(m){
+m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="cancel"){m.remove();return;}
+if(d==="up"||d==="cloud"){var t=m.querySelector("#tok").value.trim();if(!t){m.querySelector("#syncmsg").textContent="Paste the token first.";return;}connect(t,d,m);}});});}
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")pull();else if(pushTimer){clearTimeout(pushTimer);pushNow();}});
+window.addEventListener("online",function(){var c=syncCfg();if(c.gist)pushNow();});
+setInterval(function(){if(document.visibilityState==="visible")pull();},45000);
+
+render();renderPill();pull();
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
 })();
 </script></body></html>
