@@ -579,10 +579,12 @@ document.addEventListener("touchcancel",function(){if(drag&&drag.touch){drag.car
 
 updateLog();persistRaw();
 // ---------- sync via a private GitHub Gist ----------
-var SK="week-planner-sync",FILE="week-planner.json",pushTimer=null,syncState="idle",pulling=false;
+var SK="week-planner-sync",FILE="week-planner.json",pushTimer=null,syncState="idle",pulling=false,syncErr="",lastSync=0;
 function syncCfg(){try{return JSON.parse(localStorage.getItem(SK)||"{}");}catch(e){return{};}}
 function setSyncCfg(c){try{localStorage.setItem(SK,JSON.stringify(c));}catch(e){}}
-function syncLabel(){return{idle:"☁ Synced",push:"☁ Syncing…",off:"☁ Offline, will sync",err:"☁ Sync problem"}[syncState]||"";}
+function syncLabel(){return{idle:"☁ Synced",push:"☁ Syncing…",off:"☁ Offline, will sync",err:"⚠ Sync problem, tap"}[syncState]||"";}
+function errText(e){if(!e)return"";if(e.status===401)return"GitHub rejected the token (401). It was deleted or is wrong. Turn sync off here and connect again with your current token.";if(e.status===404)return"The sync file was not found (404). Turn sync off here and connect again.";if(e.status===403)return"GitHub refused the request (403). The token needs the gist scope.";return navigator.onLine===false?"No internet.":"Network error: "+(e.message||e);}
+function fail(e){syncErr=errText(e);setSync(navigator.onLine===false?"off":"err");}
 function setSync(st){syncState=st;var el=document.getElementById("syncst");if(el)el.textContent=syncLabel();}
 function gh(path,opt){var c=syncCfg();opt=opt||{};opt.headers={"Authorization":"token "+c.token,"Accept":"application/vnd.github+json"};if(opt.body)opt.headers["Content-Type"]="application/json";opt.cache="no-store";
 return fetch("https://api.github.com"+path,opt).then(function(r){if(!r.ok){var e=new Error("http "+r.status);e.status=r.status;throw e;}return r.json();});}
@@ -592,12 +594,14 @@ try{return Promise.resolve(JSON.parse(f.content));}catch(e){return Promise.resol
 function fileObj(){var o={};o[FILE]={content:JSON.stringify(state)};return o;}
 function schedulePush(){var c=syncCfg();if(!c.token||!c.gist||pulling)return;clearTimeout(pushTimer);setSync("push");pushTimer=setTimeout(pushNow,1200);}
 function pushNow(){pushTimer=null;var c=syncCfg();if(!c.token||!c.gist)return;
-gh("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:fileObj()})}).then(function(){setSync("idle");}).catch(function(){setSync(navigator.onLine===false?"off":"err");});}
+gh("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:fileObj()})}).then(function(){syncErr="";lastSync=Date.now();setSync("idle");}).catch(fail);}
 function pull(){var c=syncCfg();if(!c.token||!c.gist||pushTimer)return Promise.resolve();
 return gh("/gists/"+c.gist).then(readGist).then(function(remote){
 if(pushTimer)return;
-if(remote&&remote.tasks&&(remote.savedAt||0)>(state.savedAt||0)){pulling=true;state=remote;ensure();persistRaw();pulling=false;render();renderPill();}
-setSync("idle");}).catch(function(){setSync(navigator.onLine===false?"off":"err");});}
+var rs=(remote&&remote.savedAt)||0,ls=state.savedAt||0;
+if(remote&&remote.tasks&&rs>ls){pulling=true;state=remote;ensure();persistRaw();pulling=false;render();renderPill();}
+else if(ls>rs){pushNow();return;}
+syncErr="";lastSync=Date.now();setSync("idle");}).catch(fail);}
 function connect(token,choice,m){var c={token:token};setSyncCfg(c);
 var st=m.querySelector("#syncmsg");st.textContent="Connecting…";
 gh("/gists?per_page=100").then(function(list){var g=list.filter(function(x){return x.files&&x.files[FILE];})[0];
@@ -610,8 +614,8 @@ return gh("/gists/"+g.id,{method:"PATCH",body:JSON.stringify({files:fileObj()})}
 .then(function(r){setSync("idle");m.remove();render();renderPill();toast(r==="pulled"?"Synced: loaded your data from the cloud":r==="created"?"Sync is on. This device is now the source.":"Synced: this device's data is now in the cloud");})
 .catch(function(e){setSyncCfg({});st.textContent=e.status===401?"That token doesn't work. Check that you copied all of it and ticked “gist”.":"Couldn't connect. Check your internet and try again.";});}
 function syncDlg(){var c=syncCfg();
-if(c.token&&c.gist){dialog('<h3>Sync is on</h3><p>This device syncs automatically with your other devices through a private Gist on your GitHub.</p><p>Status: '+syncLabel()+'</p><div class="btns"><button class="danger left" data-d="off">Turn off here</button><button data-d="now">Sync now</button><button class="primary" data-d="close">Done</button></div>',function(m){
-m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="close")m.remove();if(d==="now"){pull().then(function(){if(syncState==="idle")toast("Up to date");});}if(d==="off"){setSyncCfg({});m.remove();render();toast("Sync turned off on this device");}});});return;}
+if(c.token&&c.gist){dialog('<h3>Sync is on</h3><p>This device syncs automatically with your other devices through a private Gist on your GitHub.</p><p>Status: '+syncLabel()+(lastSync?' · last check '+new Date(lastSync).toLocaleTimeString().slice(0,5):'')+'</p>'+(syncErr?'<p style="color:var(--danger)">'+esc(syncErr)+'</p>':'')+'<div class="btns"><button class="danger left" data-d="off">Turn off here</button><button data-d="now">Sync now</button><button class="primary" data-d="close">Done</button></div>',function(m){
+m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="close")m.remove();if(d==="now"){pull().then(function(){m.remove();toast(syncState==="err"?"Sync problem: "+syncErr:"Up to date");});}if(d==="off"){setSyncCfg({});m.remove();render();toast("Sync turned off on this device");}});});return;}
 dialog('<h3>Sync between devices</h3><p>Paste your GitHub token (it starts with ghp_). Use the same token on every device.</p><input type="text" id="tok" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false"><p><b>Device that has your tasks:</b> Upload this device.<br><b>Every other device:</b> Use cloud data.</p><p id="syncmsg" style="color:var(--danger)"></p><div class="btns"><button data-d="cancel" class="left">Cancel</button><button data-d="up">Upload this device</button><button class="primary" data-d="cloud">Use cloud data</button></div>',function(m){
 m.addEventListener("click",function(e){var d=e.target.getAttribute("data-d");if(d==="cancel"){m.remove();return;}
 if(d==="up"||d==="cloud"){var t=m.querySelector("#tok").value.trim();if(!t){m.querySelector("#syncmsg").textContent="Paste the token first.";return;}connect(t,d,m);}});});}
